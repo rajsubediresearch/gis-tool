@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EpiMap — Browser-based GIS Visualization</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- shpjs — shapefile reader -->
+  <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+
+  <!-- PapaParse — CSV reader -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- simple-statistics — Jenks/quantile/etc -->
+  <script src="https://unpkg.com/simple-statistics@7.8.3/dist/simple-statistics.min.js"></script>
+
+  <!-- html2canvas — PNG export -->
+  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="app-header">
+  <div class="header-brand">
+    <span class="brand-icon">⬡</span>
+    <div>
+      <div class="brand-title">EpiMap</div>
+      <div class="brand-sub">Browser-based GIS Visualization Tool</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-ghost" id="btn-demo">Load Demo Data</button>
+    <button class="btn-ghost" id="btn-help">Guide</button>
+    <button class="btn-primary" id="btn-export">Export PNG</button>
+  </div>
+</header>
+
+<!-- ══════════════ MAIN LAYOUT ══════════════ -->
+<div class="app-body">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel panel-left" id="panel-left">
+    <div class="panel-scroll">
+
+      <!-- DATA UPLOAD -->
+      <section class="panel-section">
+        <div class="section-title">Data Upload</div>
+
+        <div class="drop-zone" id="drop-shp">
+          <div class="drop-icon">🗺</div>
+          <div class="drop-label">Drop Shapefile (.zip)</div>
+          <div class="drop-sub">Contains .shp .dbf .prj files</div>
+          <input type="file" id="input-shp" accept=".zip" hidden />
+          <button class="btn-upload" onclick="document.getElementById('input-shp').click()">Browse</button>
+        </div>
+        <div class="upload-status" id="status-shp">No shapefile loaded</div>
+
+        <div class="drop-zone" id="drop-csv" style="margin-top:10px">
+          <div class="drop-icon">📊</div>
+          <div class="drop-label">Drop Data CSV</div>
+          <div class="drop-sub">Attribute data to join to map</div>
+          <input type="file" id="input-csv" accept=".csv" hidden />
+          <button class="btn-upload" onclick="document.getElementById('input-csv').click()">Browse</button>
+        </div>
+        <div class="upload-status" id="status-csv">No CSV loaded</div>
+      </section>
+
+      <!-- JOIN SETTINGS -->
+      <section class="panel-section" id="section-join" style="display:none">
+        <div class="section-title">Join Settings</div>
+        <label class="field-label">Shapefile Key Field</label>
+        <select class="field-select" id="sel-shp-key"></select>
+        <label class="field-label" style="margin-top:8px">CSV Key Field</label>
+        <select class="field-select" id="sel-csv-key"></select>
+        <button class="btn-action" id="btn-join" style="margin-top:10px">Join Data →</button>
+        <div class="upload-status" id="status-join"></div>
+      </section>
+
+      <!-- CHOROPLETH -->
+      <section class="panel-section" id="section-choropleth" style="display:none">
+        <div class="section-title">Choropleth Layer</div>
+
+        <label class="field-label">Variable (color fill)</label>
+        <select class="field-select" id="sel-choro-var"></select>
+
+        <label class="field-label" style="margin-top:8px">Classification</label>
+        <select class="field-select" id="sel-classification">
+          <option value="jenks">Natural Breaks (Jenks)</option>
+          <option value="quantile">Quantile</option>
+          <option value="equal">Equal Interval</option>
+          <option value="stddev">Std Deviation</option>
+          <option value="manual">Manual Breaks</option>
+        </select>
+
+        <label class="field-label" style="margin-top:8px">Number of Classes</label>
+        <input type="range" id="range-classes" min="3" max="9" value="5" class="range-slider" />
+        <div class="range-val" id="lbl-classes">5</div>
+
+        <div id="manual-breaks-wrapper" style="display:none;margin-top:6px">
+          <label class="field-label">Manual Breaks (comma-separated)</label>
+          <input type="text" class="field-input" id="input-manual-breaks" placeholder="e.g. 10,25,50,100" />
+        </div>
+
+        <label class="field-label" style="margin-top:8px">Color Palette</label>
+        <select class="field-select" id="sel-palette">
+          <optgroup label="Sequential">
+            <option value="YlOrRd">Yellow–Orange–Red</option>
+            <option value="Blues">Blues</option>
+            <option value="Greens">Greens</option>
+            <option value="Purples">Purples</option>
+            <option value="OrRd">Orange–Red</option>
+            <option value="BuPu">Blue–Purple</option>
+          </optgroup>
+          <optgroup label="Diverging">
+            <option value="RdBu">Red–Blue (diverging)</option>
+            <option value="PiYG">Pink–Green</option>
+            <option value="PRGn">Purple–Green</option>
+            <option value="RdYlGn">Red–Yellow–Green</option>
+          </optgroup>
+          <optgroup label="Colorblind-safe">
+            <option value="Viridis">Viridis ✓CB</option>
+            <option value="Cividis">Cividis ✓CB</option>
+            <option value="Plasma">Plasma ✓CB</option>
+            <option value="YlGnBu">Yellow–Green–Blue ✓CB</option>
+          </optgroup>
+        </select>
+
+        <label class="toggle-row" style="margin-top:8px">
+          <span>Reverse palette</span>
+          <input type="checkbox" id="chk-reverse" />
+          <span class="toggle-switch"></span>
+        </label>
+
+        <div class="palette-preview" id="palette-preview"></div>
+
+        <label class="field-label" style="margin-top:8px">Opacity</label>
+        <input type="range" id="range-opacity" min="10" max="100" value="80" class="range-slider" />
+        <div class="range-val" id="lbl-opacity">80%</div>
+
+        <label class="field-label" style="margin-top:8px">Border color</label>
+        <input type="color" id="pick-border" value="#ffffff" class="color-pick" />
+        <label class="field-label" style="margin-top:4px">Border width</label>
+        <input type="range" id="range-border" min="0" max="5" step="0.5" value="0.5" class="range-slider" />
+        <div class="range-val" id="lbl-border">0.5px</div>
+
+        <button class="btn-action" id="btn-apply-choro" style="margin-top:12px">Apply Choropleth</button>
+      </section>
+
+      <!-- PROPORTIONAL SYMBOLS -->
+      <section class="panel-section" id="section-symbols" style="display:none">
+        <div class="section-title">Proportional Symbols</div>
+        <label class="toggle-row">
+          <span>Enable symbols layer</span>
+          <input type="checkbox" id="chk-symbols" />
+          <span class="toggle-switch"></span>
+        </label>
+        <div id="symbols-options" style="display:none">
+          <label class="field-label" style="margin-top:8px">Variable (symbol size)</label>
+          <select class="field-select" id="sel-symbol-var"></select>
+          <label class="field-label" style="margin-top:8px">Max symbol radius (px)</label>
+          <input type="range" id="range-sym-size" min="5" max="50" value="20" class="range-slider" />
+          <div class="range-val" id="lbl-sym-size">20px</div>
+          <label class="field-label" style="margin-top:8px">Symbol color</label>
+          <input type="color" id="pick-sym-color" value="#e63946" class="color-pick" />
+          <label class="field-label" style="margin-top:4px">Symbol opacity</label>
+          <input type="range" id="range-sym-opacity" min="10" max="100" value="70" class="range-slider" />
+          <div class="range-val" id="lbl-sym-opacity">70%</div>
+        </div>
+      </section>
+
+      <!-- BIVARIATE -->
+      <section class="panel-section" id="section-bivariate" style="display:none">
+        <div class="section-title">Bivariate Choropleth</div>
+        <label class="toggle-row">
+          <span>Enable bivariate mode</span>
+          <input type="checkbox" id="chk-bivariate" />
+          <span class="toggle-switch"></span>
+        </label>
+        <div id="bivariate-options" style="display:none">
+          <div class="info-box">Overrides single choropleth. Uses a 3×3 color matrix for two variables.</div>
+          <label class="field-label" style="margin-top:8px">Variable X (horizontal axis)</label>
+          <select class="field-select" id="sel-biv-x"></select>
+          <label class="field-label" style="margin-top:8px">Variable Y (vertical axis)</label>
+          <select class="field-select" id="sel-biv-y"></select>
+          <label class="field-label" style="margin-top:8px">Color scheme</label>
+          <select class="field-select" id="sel-biv-scheme">
+            <option value="bluered">Blue × Red</option>
+            <option value="purpgreen">Purple × Green</option>
+            <option value="pinkblue">Pink × Blue</option>
+          </select>
+          <button class="btn-action" id="btn-apply-biv" style="margin-top:10px">Apply Bivariate</button>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- MAP AREA -->
+  <main class="map-area">
+    <div id="map"></div>
+
+    <!-- Floating map title -->
+    <div class="map-overlay-title" id="map-title-box">
+      <div class="map-title-text" id="map-title-display" contenteditable="true" spellcheck="false">Click to edit map title</div>
+      <div class="map-subtitle-text" id="map-subtitle-display" contenteditable="true" spellcheck="false">Subtitle / data source</div>
+    </div>
+
+    <!-- Draggable legend -->
+    <div class="map-legend draggable" id="map-legend" style="display:none">
+      <div class="legend-header" id="legend-drag-handle">
+        <span id="legend-title-text">Legend</span>
+        <span class="legend-close" id="btn-legend-close">×</span>
+      </div>
+      <div id="legend-body"></div>
+    </div>
+
+    <!-- North arrow -->
+    <div class="north-arrow" id="north-arrow" style="display:none">
+      <svg viewBox="0 0 24 40" width="28" height="40">
+        <polygon points="12,2 18,22 12,18 6,22" fill="#1a1a2e"/>
+        <polygon points="12,38 18,18 12,22 6,18" fill="#aaa"/>
+        <text x="12" y="36" text-anchor="middle" font-size="8" fill="#1a1a2e" font-family="sans-serif" font-weight="bold">N</text>
+      </svg>
+    </div>
+
+    <!-- Inset overview map -->
+    <div class="inset-map-box" id="inset-map-box" style="display:none">
+      <div id="inset-map"></div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="panel panel-right" id="panel-right">
+    <div class="panel-scroll">
+
+      <!-- MAP ANNOTATIONS -->
+      <section class="panel-section">
+        <div class="section-title">Map Annotations</div>
+
+        <label class="field-label">Map Title</label>
+        <input type="text" class="field-input" id="input-map-title" placeholder="Enter map title" value="Map Title" />
+
+        <label class="field-label" style="margin-top:8px">Subtitle / Source</label>
+        <input type="text" class="field-input" id="input-map-subtitle" placeholder="Data source, year, etc." value="" />
+
+        <label class="field-label" style="margin-top:8px">Title font size</label>
+        <input type="range" id="range-title-size" min="12" max="48" value="22" class="range-slider" />
+        <div class="range-val" id="lbl-title-size">22px</div>
+
+        <label class="field-label" style="margin-top:4px">Subtitle font size</label>
+        <input type="range" id="range-subtitle-size" min="9" max="28" value="13" class="range-slider" />
+        <div class="range-val" id="lbl-subtitle-size">13px</div>
+
+        <label class="field-label" style="margin-top:4px">Title color</label>
+        <input type="color" id="pick-title-color" value="#1a1a2e" class="color-pick" />
+      </section>
+
+      <!-- MAP ELEMENTS -->
+      <section class="panel-section">
+        <div class="section-title">Map Elements</div>
+
+        <label class="toggle-row">
+          <span>Show legend</span>
+          <input type="checkbox" id="chk-legend" checked />
+          <span class="toggle-switch"></span>
+        </label>
+
+        <label class="field-label" style="margin-top:8px">Legend title</label>
+        <input type="text" class="field-input" id="input-legend-title" placeholder="Legend label" value="Value" />
+
+        <label class="toggle-row" style="margin-top:8px">
+          <span>Show north arrow</span>
+          <input type="checkbox" id="chk-north" />
+          <span class="toggle-switch"></span>
+        </label>
+
+        <label class="toggle-row" style="margin-top:6px">
+          <span>Show scale bar</span>
+          <input type="checkbox" id="chk-scale" checked />
+          <span class="toggle-switch"></span>
+        </label>
+
+        <label class="toggle-row" style="margin-top:6px">
+          <span>Show inset overview</span>
+          <input type="checkbox" id="chk-inset" />
+          <span class="toggle-switch"></span>
+        </label>
+      </section>
+
+      <!-- BASE MAP -->
+      <section class="panel-section">
+        <div class="section-title">Base Map</div>
+        <select class="field-select" id="sel-basemap">
+          <option value="none">None (white background)</option>
+          <option value="osm">OpenStreetMap</option>
+          <option value="carto-light">Carto Light</option>
+          <option value="carto-dark">Carto Dark</option>
+          <option value="esri-topo">ESRI Topo</option>
+        </select>
+      </section>
+
+      <!-- TOOLTIP -->
+      <section class="panel-section" id="section-tooltip" style="display:none">
+        <div class="section-title">Tooltip Fields</div>
+        <div class="info-box">Click fields to show in popup when user clicks a region.</div>
+        <div id="tooltip-fields-list"></div>
+      </section>
+
+      <!-- DATA SUMMARY -->
+      <section class="panel-section" id="section-summary" style="display:none">
+        <div class="section-title">Data Summary</div>
+        <div id="data-summary-body"></div>
+      </section>
+
+    </div>
+  </aside>
+
+</div>
+
+<!-- HELP MODAL -->
+<div class="modal-backdrop" id="modal-help" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <span>How to use EpiMap</span>
+      <button class="modal-close" id="btn-help-close">×</button>
+    </div>
+    <div class="modal-body">
+      <h3>Quick Start</h3>
+      <ol>
+        <li><strong>Load Demo Data</strong> to see the tool in action immediately.</li>
+        <li>Or upload a <strong>zipped shapefile</strong> (.zip containing .shp, .dbf, .prj) and a <strong>CSV</strong> with your attribute data.</li>
+        <li>Set the <strong>join key</strong> — the field that links your shapefile to your CSV (e.g., state name, FIPS code).</li>
+        <li>Choose a variable, classification scheme, and color palette in the <strong>Choropleth Layer</strong> panel.</li>
+        <li>Optionally enable <strong>Proportional Symbols</strong> or <strong>Bivariate</strong> mode for multi-variable mapping.</li>
+        <li>Add a <strong>title, legend, north arrow</strong> using the right panel.</li>
+        <li><strong>Export PNG</strong> when ready.</li>
+      </ol>
+      <h3>Classification Schemes</h3>
+      <ul>
+        <li><strong>Jenks (Natural Breaks)</strong> — minimizes within-class variance; best for most epidemiological data</li>
+        <li><strong>Quantile</strong> — equal number of features per class; good for skewed distributions</li>
+        <li><strong>Equal Interval</strong> — equal data range per class; intuitive but sensitive to outliers</li>
+        <li><strong>Std Deviation</strong> — classes relative to mean; useful for showing deviation from average</li>
+        <li><strong>Manual</strong> — define your own break points</li>
+      </ul>
+      <h3>Colorblind-Safe Palettes</h3>
+      <p>Palettes marked ✓CB (Viridis, Cividis, Plasma, YlGnBu) are safe for all major types of color vision deficiency.</p>
+      <h3>Shapefile Format</h3>
+      <p>Zip your .shp, .dbf, .prj (and optionally .shx) into a single .zip file. The tool reads WGS84 (EPSG:4326) coordinates. Most shapefiles from GADM, Natural Earth, Census TIGER are already in WGS84.</p>
+    </div>
+  </div>
+</div>
+
+<script src="js/palettes.js"></script>
+<script src="js/classify.js"></script>
+<script src="js/map.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
