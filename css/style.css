@@ -699,3 +699,78 @@ html, body {
   .panel-right { display: none; }
   :root { --panel-w: 240px; }
 }
+
+/* ══ v2 ADDITIONS ══════════════════════════ */
+
+/* Warning info box */
+.info-box.warn {
+  border-left-color: var(--warning);
+  color: var(--warning);
+  background: rgba(245,166,35,0.08);
+}
+
+/* Attribute table modal */
+.modal-wide {
+  max-width: 90vw !important;
+  width: 90vw !important;
+}
+
+.attr-table-body {
+  padding: 0 !important;
+  overflow: auto !important;
+  max-height: 70vh;
+}
+
+.attr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  white-space: nowrap;
+}
+
+.attr-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  color: var(--accent);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  z-index: 1;
+}
+
+.attr-table td {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attr-table tr:hover td {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Multi-select sizing */
+select[multiple] {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px;
+  width: 100%;
+  outline: none;
+}
+
+select[multiple] option:checked {
+  background: var(--accent-dim);
+  color: var(--accent);
+}

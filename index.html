@@ -4,28 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EpiMap — Browser-based GIS Visualization</title>
-
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- shpjs — shapefile reader -->
   <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-
-  <!-- PapaParse — CSV reader -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-
-  <!-- simple-statistics — Jenks/quantile/etc -->
   <script src="https://unpkg.com/simple-statistics@7.8.3/dist/simple-statistics.min.js"></script>
-
-  <!-- html2canvas — PNG export -->
   <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-<!-- ══════════════ HEADER ══════════════ -->
+<!-- ══ HEADER ══════════════════════════════ -->
 <header class="app-header">
   <div class="header-brand">
     <span class="brand-icon">⬡</span>
@@ -35,23 +24,23 @@
     </div>
   </div>
   <div class="header-actions">
+    <button class="btn-ghost" id="btn-attr-table" style="display:none">Attribute Table</button>
     <button class="btn-ghost" id="btn-demo">Load Demo Data</button>
     <button class="btn-ghost" id="btn-help">Guide</button>
     <button class="btn-primary" id="btn-export">Export PNG</button>
   </div>
 </header>
 
-<!-- ══════════════ MAIN LAYOUT ══════════════ -->
+<!-- ══ MAIN LAYOUT ══════════════════════════ -->
 <div class="app-body">
 
   <!-- LEFT PANEL -->
-  <aside class="panel panel-left" id="panel-left">
+  <aside class="panel panel-left">
     <div class="panel-scroll">
 
       <!-- DATA UPLOAD -->
       <section class="panel-section">
         <div class="section-title">Data Upload</div>
-
         <div class="drop-zone" id="drop-shp">
           <div class="drop-icon">🗺</div>
           <div class="drop-label">Drop Shapefile (.zip)</div>
@@ -64,7 +53,7 @@
         <div class="drop-zone" id="drop-csv" style="margin-top:10px">
           <div class="drop-icon">📊</div>
           <div class="drop-label">Drop Data CSV</div>
-          <div class="drop-sub">Attribute data to join to map</div>
+          <div class="drop-sub">Pre-aggregated or granular (long format)</div>
           <input type="file" id="input-csv" accept=".csv" hidden />
           <button class="btn-upload" onclick="document.getElementById('input-csv').click()">Browse</button>
         </div>
@@ -78,8 +67,48 @@
         <select class="field-select" id="sel-shp-key"></select>
         <label class="field-label" style="margin-top:8px">CSV Key Field</label>
         <select class="field-select" id="sel-csv-key"></select>
-        <button class="btn-action" id="btn-join" style="margin-top:10px">Join Data →</button>
+        <button class="btn-action" id="btn-join" style="margin-top:10px">Detect & Join →</button>
         <div class="upload-status" id="status-join"></div>
+      </section>
+
+      <!-- AGGREGATION PANEL (shown only for granular CSVs) -->
+      <section class="panel-section" id="section-agg" style="display:none">
+        <div class="section-title">Aggregate Data</div>
+        <div class="info-box warn" id="agg-warning"></div>
+
+        <!-- Age range filter -->
+        <div id="agg-age-section" style="display:none;margin-top:10px">
+          <label class="field-label">Age Range Filter</label>
+          <input type="hidden" id="agg-age-col" value="" />
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <span class="field-label" style="margin:0;white-space:nowrap">Min</span>
+            <input type="range" id="range-age-min" min="0" max="100" value="0" class="range-slider" />
+            <span class="range-val" id="lbl-age-min" style="min-width:24px">0</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <span class="field-label" style="margin:0;white-space:nowrap">Max</span>
+            <input type="range" id="range-age-max" min="0" max="100" value="100" class="range-slider" />
+            <span class="range-val" id="lbl-age-max" style="min-width:24px">100</span>
+          </div>
+        </div>
+
+        <!-- Categorical filters injected here dynamically -->
+        <div id="agg-filters" style="margin-top:8px"></div>
+
+        <label class="field-label" style="margin-top:10px">Variable to Aggregate</label>
+        <select class="field-select" id="sel-agg-var"></select>
+
+        <label class="field-label" style="margin-top:8px">Aggregation Function</label>
+        <select class="field-select" id="sel-agg-fn">
+          <option value="sum">Sum</option>
+          <option value="mean">Mean</option>
+          <option value="median">Median</option>
+          <option value="count">Count</option>
+          <option value="max">Max</option>
+          <option value="min">Min</option>
+        </select>
+
+        <button class="btn-action" id="btn-apply-agg" style="margin-top:12px">Aggregate &amp; Join →</button>
       </section>
 
       <!-- CHOROPLETH -->
@@ -136,7 +165,6 @@
           <input type="checkbox" id="chk-reverse" />
           <span class="toggle-switch"></span>
         </label>
-
         <div class="palette-preview" id="palette-preview"></div>
 
         <label class="field-label" style="margin-top:8px">Opacity</label>
@@ -183,10 +211,10 @@
           <span class="toggle-switch"></span>
         </label>
         <div id="bivariate-options" style="display:none">
-          <div class="info-box">Overrides single choropleth. Uses a 3×3 color matrix for two variables.</div>
-          <label class="field-label" style="margin-top:8px">Variable X (horizontal axis)</label>
+          <div class="info-box" style="margin-top:8px">Overrides single choropleth. Uses a 3×3 color matrix for two variables simultaneously.</div>
+          <label class="field-label" style="margin-top:8px">Variable X (horizontal)</label>
           <select class="field-select" id="sel-biv-x"></select>
-          <label class="field-label" style="margin-top:8px">Variable Y (vertical axis)</label>
+          <label class="field-label" style="margin-top:8px">Variable Y (vertical)</label>
           <select class="field-select" id="sel-biv-y"></select>
           <label class="field-label" style="margin-top:8px">Color scheme</label>
           <select class="field-select" id="sel-biv-scheme">
@@ -205,13 +233,11 @@
   <main class="map-area">
     <div id="map"></div>
 
-    <!-- Floating map title -->
     <div class="map-overlay-title" id="map-title-box">
       <div class="map-title-text" id="map-title-display" contenteditable="true" spellcheck="false">Click to edit map title</div>
       <div class="map-subtitle-text" id="map-subtitle-display" contenteditable="true" spellcheck="false">Subtitle / data source</div>
     </div>
 
-    <!-- Draggable legend -->
     <div class="map-legend draggable" id="map-legend" style="display:none">
       <div class="legend-header" id="legend-drag-handle">
         <span id="legend-title-text">Legend</span>
@@ -220,7 +246,6 @@
       <div id="legend-body"></div>
     </div>
 
-    <!-- North arrow -->
     <div class="north-arrow" id="north-arrow" style="display:none">
       <svg viewBox="0 0 24 40" width="28" height="40">
         <polygon points="12,2 18,22 12,18 6,22" fill="#1a1a2e"/>
@@ -229,35 +254,28 @@
       </svg>
     </div>
 
-    <!-- Inset overview map -->
     <div class="inset-map-box" id="inset-map-box" style="display:none">
       <div id="inset-map"></div>
     </div>
-
   </main>
 
   <!-- RIGHT PANEL -->
-  <aside class="panel panel-right" id="panel-right">
+  <aside class="panel panel-right">
     <div class="panel-scroll">
 
       <!-- MAP ANNOTATIONS -->
       <section class="panel-section">
         <div class="section-title">Map Annotations</div>
-
         <label class="field-label">Map Title</label>
         <input type="text" class="field-input" id="input-map-title" placeholder="Enter map title" value="Map Title" />
-
         <label class="field-label" style="margin-top:8px">Subtitle / Source</label>
         <input type="text" class="field-input" id="input-map-subtitle" placeholder="Data source, year, etc." value="" />
-
         <label class="field-label" style="margin-top:8px">Title font size</label>
         <input type="range" id="range-title-size" min="12" max="48" value="22" class="range-slider" />
         <div class="range-val" id="lbl-title-size">22px</div>
-
         <label class="field-label" style="margin-top:4px">Subtitle font size</label>
         <input type="range" id="range-subtitle-size" min="9" max="28" value="13" class="range-slider" />
         <div class="range-val" id="lbl-subtitle-size">13px</div>
-
         <label class="field-label" style="margin-top:4px">Title color</label>
         <input type="color" id="pick-title-color" value="#1a1a2e" class="color-pick" />
       </section>
@@ -265,28 +283,23 @@
       <!-- MAP ELEMENTS -->
       <section class="panel-section">
         <div class="section-title">Map Elements</div>
-
         <label class="toggle-row">
           <span>Show legend</span>
           <input type="checkbox" id="chk-legend" checked />
           <span class="toggle-switch"></span>
         </label>
-
         <label class="field-label" style="margin-top:8px">Legend title</label>
         <input type="text" class="field-input" id="input-legend-title" placeholder="Legend label" value="Value" />
-
         <label class="toggle-row" style="margin-top:8px">
           <span>Show north arrow</span>
           <input type="checkbox" id="chk-north" />
           <span class="toggle-switch"></span>
         </label>
-
         <label class="toggle-row" style="margin-top:6px">
           <span>Show scale bar</span>
           <input type="checkbox" id="chk-scale" checked />
           <span class="toggle-switch"></span>
         </label>
-
         <label class="toggle-row" style="margin-top:6px">
           <span>Show inset overview</span>
           <input type="checkbox" id="chk-inset" />
@@ -309,8 +322,8 @@
       <!-- TOOLTIP -->
       <section class="panel-section" id="section-tooltip" style="display:none">
         <div class="section-title">Tooltip Fields</div>
-        <div class="info-box">Click fields to show in popup when user clicks a region.</div>
-        <div id="tooltip-fields-list"></div>
+        <div class="info-box">Check fields to show in popup when clicking a region.</div>
+        <div id="tooltip-fields-list" style="margin-top:6px"></div>
       </section>
 
       <!-- DATA SUMMARY -->
@@ -321,10 +334,28 @@
 
     </div>
   </aside>
-
 </div>
 
-<!-- HELP MODAL -->
+<!-- ══ ATTRIBUTE TABLE MODAL ════════════════ -->
+<div class="modal-backdrop" id="modal-attr-table" style="display:none">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <span>Attribute Table</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span id="attr-table-note" style="font-size:11px;font-weight:400;color:var(--text-muted)"></span>
+        <button class="modal-close" id="btn-attr-table-close">×</button>
+      </div>
+    </div>
+    <div class="modal-body attr-table-body">
+      <table class="attr-table">
+        <thead id="attr-table-head"></thead>
+        <tbody id="attr-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HELP MODAL ════════════════════════════ -->
 <div class="modal-backdrop" id="modal-help" style="display:none">
   <div class="modal">
     <div class="modal-header">
@@ -334,26 +365,29 @@
     <div class="modal-body">
       <h3>Quick Start</h3>
       <ol>
-        <li><strong>Load Demo Data</strong> to see the tool in action immediately.</li>
-        <li>Or upload a <strong>zipped shapefile</strong> (.zip containing .shp, .dbf, .prj) and a <strong>CSV</strong> with your attribute data.</li>
-        <li>Set the <strong>join key</strong> — the field that links your shapefile to your CSV (e.g., state name, FIPS code).</li>
-        <li>Choose a variable, classification scheme, and color palette in the <strong>Choropleth Layer</strong> panel.</li>
-        <li>Optionally enable <strong>Proportional Symbols</strong> or <strong>Bivariate</strong> mode for multi-variable mapping.</li>
-        <li>Add a <strong>title, legend, north arrow</strong> using the right panel.</li>
-        <li><strong>Export PNG</strong> when ready.</li>
+        <li>Click <strong>Load Demo Data</strong> to see the tool immediately.</li>
+        <li>Or upload a <strong>zipped shapefile</strong> and a <strong>CSV</strong>.</li>
+        <li>Set the <strong>join key</strong> — the field linking shapefile to CSV.</li>
+        <li>If your CSV is <strong>granular (long format)</strong> — e.g. one row per county × age × gender — the tool will detect this automatically and show aggregation options: filter by age range, filter by category (gender, year…), choose sum/mean/count etc.</li>
+        <li>Choose a variable, classification, and color palette in the <strong>Choropleth Layer</strong> panel.</li>
+        <li>Optionally enable <strong>Proportional Symbols</strong> or <strong>Bivariate</strong> mode.</li>
+        <li>Add title, legend, north arrow in the right panel. <strong>Export PNG</strong> when ready.</li>
       </ol>
+      <h3>CSV Formats Supported</h3>
+      <ul>
+        <li><strong>Wide / pre-aggregated</strong> — one row per geographic unit, multiple columns. Joined directly.</li>
+        <li><strong>Long / granular</strong> — multiple rows per unit (e.g. by age, gender, year). Tool detects this and prompts for aggregation: filter by age range or category, then sum/mean/median/count.</li>
+      </ul>
       <h3>Classification Schemes</h3>
       <ul>
-        <li><strong>Jenks (Natural Breaks)</strong> — minimizes within-class variance; best for most epidemiological data</li>
-        <li><strong>Quantile</strong> — equal number of features per class; good for skewed distributions</li>
-        <li><strong>Equal Interval</strong> — equal data range per class; intuitive but sensitive to outliers</li>
-        <li><strong>Std Deviation</strong> — classes relative to mean; useful for showing deviation from average</li>
-        <li><strong>Manual</strong> — define your own break points</li>
+        <li><strong>Jenks</strong> — natural breaks, minimizes within-class variance; best for most epi data</li>
+        <li><strong>Quantile</strong> — equal features per class; good for skewed distributions</li>
+        <li><strong>Equal Interval</strong> — equal data range; intuitive but sensitive to outliers</li>
+        <li><strong>Std Deviation</strong> — classes relative to mean</li>
+        <li><strong>Manual</strong> — define your own breakpoints</li>
       </ul>
       <h3>Colorblind-Safe Palettes</h3>
       <p>Palettes marked ✓CB (Viridis, Cividis, Plasma, YlGnBu) are safe for all major types of color vision deficiency.</p>
-      <h3>Shapefile Format</h3>
-      <p>Zip your .shp, .dbf, .prj (and optionally .shx) into a single .zip file. The tool reads WGS84 (EPSG:4326) coordinates. Most shapefiles from GADM, Natural Earth, Census TIGER are already in WGS84.</p>
     </div>
   </div>
 </div>
