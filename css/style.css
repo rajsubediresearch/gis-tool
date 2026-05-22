@@ -774,3 +774,110 @@ select[multiple] option:checked {
   background: var(--accent-dim);
   color: var(--accent);
 }
+
+/* ══ v3 FILTER UI ══════════════════════════ */
+
+.agg-filter-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.agg-filter-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.filter-tag {
+  display: inline-block;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+}
+
+.age-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.age-bound-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 46px;
+  flex-shrink: 0;
+}
+
+.age-bound-val {
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text-primary);
+  min-width: 28px;
+  text-align: right;
+}
+
+.age-preview {
+  font-size: 10px;
+  color: var(--success);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(62,207,142,0.07);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--success);
+}
+
+.cat-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cat-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cat-checkbox-item:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.cat-checkbox-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.cat-checkbox-item:has(input:checked) {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.filter-hint {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
